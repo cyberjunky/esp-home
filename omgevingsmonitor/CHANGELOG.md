@@ -4,6 +4,30 @@ All notable changes to the Omgevingsmonitor firmware. Versions follow
 [Semantic Versioning](https://semver.org/); the STM32 firmware and the ESPHome configuration
 share a version number.
 
+## 1.2.0 - 2026-11-20
+
+### Added
+
+- **Early reports on significant change** (temperature, humidity, VOC), rate limited, and a
+  **Report reason** sensor (scheduled, boot, button, significant change, USB, maintenance).
+- **VOC baseline persistence**: the gas index algorithm state is kept in RTC backup registers and
+  restored after a reset or flash when less than 10 minutes old (**VOC baseline restored**).
+  The RTC now keeps running across resets.
+- **Dew point** and **absolute humidity**, computed in the ESPHome component.
+- **Sound level background (LA90)** and **LA10**; the measurement window is now 4 s.
+- **Solar charging (24 h)**: minutes the solar cell charged the battery in the last 24 hours.
+
+## 1.1.0 - 2026-11-20
+
+### Added
+
+- Energy estimate without a current sensor: the STM32 measures how long every consumer is on
+  (ESP, CPU, SGP40 hotplate, microphone, 5 V boost) and reports **Energy consumption**
+  (mAh/day, 24 h average), **Battery runtime without sun** (days) and **Report duration**
+  (how long the ESP was on for the last report).
+- Home Assistant package: **battery trend** (%/day over 24 h) and **battery life at current
+  trend**, which includes what the solar cell actually adds.
+
 ## 1.0.1 - 2026-11-20
 
 ### Fixed

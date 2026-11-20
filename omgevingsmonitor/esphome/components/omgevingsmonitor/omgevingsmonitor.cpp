@@ -162,6 +162,12 @@ static const char *reset_name(int r) {
   return (r >= 0 && r <= 5) ? names[r] : "Unknown";
 }
 
+static const char *reason_name(int r) {
+  static const char *const names[] = {"Scheduled", "Boot", "Button", "Significant change",
+                                      "USB plugged/unplugged", "Maintenance"};
+  return (r >= 0 && r <= 5) ? names[r] : "Unknown";
+}
+
 static std::string present_list(uint32_t p) {
   static const char *const names[] = {"WSEN-HIDS", "SGP40", "ICS-43434", "AHT20",
                                       "BMP280",    "BME280", "ENS160",   "SEN5x"};
@@ -179,6 +185,7 @@ void OmgevingsmonitorComponent::handle_data_(char *payload) {
   this->got_data_ = true;
   this->frames_++;
   int mode = -1;
+  float t = NAN, h = NAN;
   ESP_LOGD(TAG, "Frame %u: %s", (unsigned) this->frames_, payload);
 
   char *save = nullptr;
@@ -198,9 +205,14 @@ void OmgevingsmonitorComponent::handle_data_(char *payload) {
     if (strcmp(key, "us") == 0 && this->usb_bs_) this->usb_bs_->publish_state(v != 0);
     if (strcmp(key, "cs") == 0 && this->charging_bs_) this->charging_bs_->publish_state(v == 1);
     if (strcmp(key, "mt") == 0 && this->maint_bs_) this->maint_bs_->publish_state(v != 0);
+    if (strcmp(key, "vx") == 0 && this->voc_restored_bs_) this->voc_restored_bs_->publish_state(v != 0);
 #endif
     if (strcmp(key, "md") == 0) mode = static_cast<int>(v);
+    if (strcmp(key, "t") == 0) t = v * 0.01f;
+    if (strcmp(key, "h") == 0) h = v * 0.01f;
 #ifdef USE_TEXT_SENSOR
+    if (strcmp(key, "rr") == 0 && this->reason_ts_)
+      this->reason_ts_->publish_state(reason_name(static_cast<int>(v)));
     if (strcmp(key, "md") == 0 && this->mode_ts_) this->mode_ts_->publish_state(mode_name(static_cast<int>(v)));
     if (strcmp(key, "cs") == 0 && this->charger_ts_) this->charger_ts_->publish_state(charger_name(static_cast<int>(v)));
     if (strcmp(key, "rs") == 0 && this->reset_ts_) this->reset_ts_->publish_state(reset_name(static_cast<int>(v)));
@@ -212,6 +224,18 @@ void OmgevingsmonitorComponent::handle_data_(char *payload) {
     }
 #endif
   }
+#ifdef USE_SENSOR
+  // Magnus formula (Sonntag 1990 constants), valid -45..60 degC
+  if (std::isfinite(t) && std::isfinite(h) && h > 0.0f) {
+    const float a = 17.62f, b = 243.12f;
+    float gamma = logf(h / 100.0f) + a * t / (b + t);
+    if (this->dew_point_ != nullptr) this->dew_point_->publish_state(b * gamma / (a - gamma));
+    if (this->abs_humidity_ != nullptr) {
+      float es = 6.112f * expf(a * t / (b + t));  // saturation vapour pressure, hPa
+      this->abs_humidity_->publish_state(216.7f * (h / 100.0f * es) / (273.15f + t));
+    }
+  }
+#endif
   ESP_LOGI(TAG, "Data frame received (mode: %s)", mode_name(mode));
 }
 

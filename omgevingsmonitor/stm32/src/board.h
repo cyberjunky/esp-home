@@ -10,8 +10,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define FW_VERSION      "1.0.1"
-#define FW_VERSION_NUM  101      /* reported to Home Assistant as fw=101 -> 1.0.1 */
+#define FW_VERSION      "1.2.0"
+#define FW_VERSION_NUM  120      /* reported to Home Assistant as fw=120 -> 1.2.0 */
 
 /* --- ESP32-C3 ------------------------------------------------------------ */
 #define ESP_EN_PORT        GPIOH

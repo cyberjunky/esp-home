@@ -50,6 +50,10 @@ SENSORS = {
                                     device_class=DEVICE_CLASS_SOUND_PRESSURE, state_class=MEAS)),
     "sound_level_max": ("lx", 0.1, dict(unit_of_measurement=UNIT_DBA, accuracy_decimals=1,
                                         device_class=DEVICE_CLASS_SOUND_PRESSURE, state_class=MEAS)),
+    "sound_level_background": ("l9", 0.1, dict(unit_of_measurement=UNIT_DBA, accuracy_decimals=1,
+                                               device_class=DEVICE_CLASS_SOUND_PRESSURE, state_class=MEAS)),
+    "sound_level_l10": ("l1", 0.1, dict(unit_of_measurement=UNIT_DBA, accuracy_decimals=1,
+                                        device_class=DEVICE_CLASS_SOUND_PRESSURE, state_class=MEAS)),
     # power
     "battery_voltage": ("vb", 0.001, dict(unit_of_measurement=UNIT_VOLT, accuracy_decimals=3,
                                           device_class=DEVICE_CLASS_VOLTAGE, state_class=MEAS)),
@@ -57,6 +61,17 @@ SENSORS = {
                                     device_class=DEVICE_CLASS_BATTERY, state_class=MEAS)),
     "solar_voltage": ("vs", 0.001, dict(unit_of_measurement=UNIT_VOLT, accuracy_decimals=2,
                                         device_class=DEVICE_CLASS_VOLTAGE, state_class=MEAS)),
+    "solar_charging_time": ("sc", 1, dict(unit_of_measurement="min", accuracy_decimals=0,
+                                          device_class=DEVICE_CLASS_DURATION, icon="mdi:solar-power",
+                                          state_class=MEAS)),
+    # energy estimate (no current sensor: measured on-times x typical currents)
+    "energy_consumption": ("ec", 0.1, dict(unit_of_measurement="mAh/d", accuracy_decimals=1,
+                                           icon="mdi:battery-arrow-down-outline", state_class=MEAS)),
+    "battery_runtime": ("rd", 0.1, dict(unit_of_measurement="d", accuracy_decimals=0,
+                                        icon="mdi:battery-clock-outline", state_class=MEAS)),
+    "report_duration": ("ed", 0.001, dict(unit_of_measurement=UNIT_SECOND, accuracy_decimals=1,
+                                          device_class=DEVICE_CLASS_DURATION, state_class=MEAS,
+                                          entity_category=DIAG)),
     # optional AHT20
     "aht20_temperature": ("at", 0.01, dict(unit_of_measurement=UNIT_CELSIUS, accuracy_decimals=1,
                                            device_class=DEVICE_CLASS_TEMPERATURE, state_class=MEAS)),
@@ -102,9 +117,20 @@ SENSORS = {
                                     entity_category=DIAG)),
 }
 
+# computed on the ESP from temperature + humidity
+COMPUTED = {
+    "dew_point": ("set_dew_point_sensor", dict(unit_of_measurement=UNIT_CELSIUS, accuracy_decimals=1,
+                                               device_class=DEVICE_CLASS_TEMPERATURE,
+                                               icon="mdi:water-thermometer", state_class=MEAS)),
+    "absolute_humidity": ("set_absolute_humidity_sensor", dict(unit_of_measurement="g/m³", accuracy_decimals=1,
+                                                               icon="mdi:water", state_class=MEAS)),
+}
+
 CONFIG_SCHEMA = cv.Schema(
     {cv.GenerateID(CONF_OMGEVINGSMONITOR_ID): cv.use_id(OmgevingsmonitorComponent)}
-).extend({cv.Optional(k): sensor.sensor_schema(**kw) for k, (_, _, kw) in SENSORS.items()})
+).extend({cv.Optional(k): sensor.sensor_schema(**kw) for k, (_, _, kw) in SENSORS.items()}).extend(
+    {cv.Optional(k): sensor.sensor_schema(**kw) for k, (_, kw) in COMPUTED.items()}
+)
 
 
 async def to_code(config):
@@ -113,3 +139,6 @@ async def to_code(config):
         if key in config:
             s = await sensor.new_sensor(config[key])
             cg.add(hub.add_sensor(frame_key, scale, s))
+    for key, (setter, _) in COMPUTED.items():
+        if key in config:
+            cg.add(getattr(hub, setter)(await sensor.new_sensor(config[key])))

@@ -22,6 +22,8 @@ typedef uint16_t (*frame_fn)(char *buf, uint16_t size);
 enum link_result link_session(frame_fn make_frame, uint32_t refresh_ms, uint16_t timeout_s,
                               uint16_t local_maint_s, struct link_config *cfg);
 
+uint32_t link_last_on_ms(void);  /* ESP power-on time of the last session */
+
 /* helpers for building frames */
 uint16_t frame_begin(char *buf, uint16_t size, char type);
 uint16_t frame_add(char *buf, uint16_t size, uint16_t pos, const char *key, int32_t value);

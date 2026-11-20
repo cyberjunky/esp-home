@@ -45,9 +45,16 @@ While a maintenance request (`mt` > 0, or a long press of the user button) is ac
 | `vs` | solar voltage | mV | always |
 | `us` | USB power present | 0/1 | always |
 | `cs` | charger | 0 off, 1 charging, 2 full | always |
+| `ed` | ESP on-time of the previous report | ms | always |
+| `ec` | estimated consumption, 24 h average | mAh/day ×10 | after the first report |
+| `rd` | runtime without sun | days ×10 | on battery |
+| `rr` | report reason | 0 scheduled, 1 boot, 2 button, 3 significant change, 4 USB, 5 maintenance | always |
+| `sc` | solar charging in the last 24 h | minutes | always |
+| `vx` | VOC baseline restored after a reset | 0/1 | always |
 | `t`, `h` | WSEN-HIDS temperature / RH | °C×100, %×100 | HIDS ok |
 | `vr`, `vi` | SGP40 raw / VOC index | –, 1..500 | SGP40 ok (index after learning starts) |
 | `la`, `lx` | sound LAeq / LAmax (125 ms) | dB(A)×10 | mic ok |
+| `l9`, `l1` | sound LA90 (background) / LA10 | dB(A)×10 | mic ok |
 | `at`, `ah` | AHT20 temperature / RH | °C×100, %×100 | AHT20 fitted |
 | `bt`, `pa` | BMP/BME280 temperature / pressure | °C×100, Pa | BMP/BME280 fitted |
 | `bh` | BME280 RH | %×100 | BME280 fitted |

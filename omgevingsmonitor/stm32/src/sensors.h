@@ -38,6 +38,7 @@ struct readings {
   int16_t t_c100;       uint16_t rh_100;        /* HIDS                     */
   uint16_t voc_raw;     uint16_t voc_index;     /* SGP40 + gas index algo   */
   uint16_t la_10;       uint16_t lmax_10;       /* dB(A) x10: Leq and Lmax  */
+  uint16_t la90_10;     uint16_t la10_10;       /* dB(A) x10: LA90, LA10    */
   int16_t aht_t_c100;   uint16_t aht_rh_100;    /* AHT20                    */
   int16_t bmp_t_c100;   uint32_t p_pa;          /* BMP/BME280               */
   uint16_t bme_rh_100;
@@ -50,6 +51,7 @@ struct readings {
 
 extern uint32_t g_present;     /* HAS_* bits */
 extern uint8_t g_sen5x_type;   /* 50, 54, 55 or 0 */
+extern bool g_voc_restored;    /* VOC baseline restored after a reset */
 
 void sensors_probe(void);
 

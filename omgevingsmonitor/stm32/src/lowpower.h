@@ -17,7 +17,14 @@ void lp_nap_ms(uint32_t ms);
 void lp_inhibit_stop(bool on);      /* while the ESP UART is live           */
 void lp_kick(void);                 /* refresh watchdog                         */
 bool lp_lse_ok(void);
+bool lp_rtc_kept(void);             /* RTC survived the last reset              */
 uint8_t lp_reset_cause(void);       /* see RESET_* below                        */
+uint32_t lp_abs_s(void);            /* RTC seconds since 2000 (keeps across resets) */
+
+/* RTC backup registers 0..4: survive resets, no flash wear.
+ *   0..3  VOC algorithm state + time + check (sensors.c)   4  free */
+uint32_t lp_bkp_read(uint8_t idx);
+void lp_bkp_write(uint8_t idx, uint32_t v);
 
 enum {
   RESET_POWER = 0, RESET_PIN = 1, RESET_SOFTWARE = 2, RESET_WATCHDOG = 3,

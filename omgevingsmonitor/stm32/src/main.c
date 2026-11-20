@@ -13,8 +13,10 @@
  *   Wi-Fi/HA unreachable: interval backs off x2 / x4 after repeated failures
  * USB: fixed short interval, SEN5x/ENS160 run continuously.
  */
+#include <stdlib.h>
 #include <string.h>
 #include "board.h"
+#include "energy.h"
 #include "bridge.h"
 #include "i2c_bus.h"
 #include "link.h"
@@ -46,6 +48,75 @@ static uint16_t cur_interval_s;
 static uint32_t reports;
 static bool maint_active;
 
+/* why a report was sent (shown in HA as "Report reason") */
+enum reason { RR_SCHEDULED = 0, RR_BOOT = 1, RR_BUTTON = 2, RR_CHANGE = 3, RR_USB = 4, RR_MAINT = 5 };
+static uint8_t next_reason = RR_BOOT, last_reason;
+
+/* --- early report on significant change ----------------------------------
+ * The 10 s readings run anyway; when something changes a lot, report now
+ * instead of waiting for the (possibly long) interval. Rate limited. */
+#ifndef EARLY_DT_C100
+#define EARLY_DT_C100 150        /* 1.5 degC                                  */
+#endif
+#ifndef EARLY_DRH_100
+#define EARLY_DRH_100 800        /* 8 %RH                                     */
+#endif
+#ifndef EARLY_DVOC
+#define EARLY_DVOC 80            /* VOC index points                          */
+#endif
+#ifndef EARLY_VOC_ALARM
+#define EARLY_VOC_ALARM 250      /* crossing this always counts (also saving) */
+#endif
+#define EARLY_MIN_GAP_S 180
+#define EARLY_MAX_PER_HOUR 4
+static int16_t rep_t;
+static uint16_t rep_rh, rep_voc;
+static uint32_t rep_valid;
+static uint64_t last_report_ms, early_window_ms;
+static uint8_t early_count;
+
+/* --- solar charging minutes in the last 24 h (hourly buckets) ------------ */
+static uint8_t chg_min[24];
+static uint32_t chg_hour;
+
+static void charge_tick(void) { /* called once per POWER_CHECK_MS (1 min) */
+  uint32_t hour = (uint32_t)(lp_now_ms() / 3600000u);
+  while (chg_hour < hour) chg_min[++chg_hour % 24] = 0;
+  if (!g_pwr.usb && g_pwr.charge == CHG_CHARGING && chg_min[hour % 24] < 60) chg_min[hour % 24]++;
+}
+
+static uint16_t charge_minutes_24h(void) {
+  uint16_t sum = 0;
+  for (int i = 0; i < 24; i++) sum += chg_min[i];
+  return sum;
+}
+
+static void check_change(void) {
+  if (!rep_valid || mode == MODE_SURVIVAL) return;
+  uint64_t now = lp_now_ms();
+  if (now - last_report_ms < EARLY_MIN_GAP_S * 1000u || next_report_ms <= now) return;
+  if (now - early_window_ms > 3600000u) {
+    early_window_ms = now;
+    early_count = 0;
+  }
+  if (early_count >= EARLY_MAX_PER_HOUR) return;
+  const struct readings *r = &g_r;
+  bool voc_now = r->valid & V_VOC_INDEX, voc_rep = rep_valid & V_VOC_INDEX;
+  bool big = voc_now && voc_rep && r->voc_index >= EARLY_VOC_ALARM && rep_voc < EARLY_VOC_ALARM;
+  if (mode != MODE_SAVING) {
+    if ((r->valid & V_HIDS) && (rep_valid & V_HIDS)) {
+      if (abs(r->t_c100 - rep_t) >= EARLY_DT_C100) big = true;
+      if (abs((int)r->rh_100 - (int)rep_rh) >= EARLY_DRH_100) big = true;
+    }
+    if (voc_now && voc_rep && abs((int)r->voc_index - (int)rep_voc) >= EARLY_DVOC) big = true;
+  }
+  if (big) {
+    next_report_ms = now;
+    next_reason = RR_CHANGE;
+    early_count++;
+  }
+}
+
 /* ------------------------------------------------------------------------ */
 /* scheduling helpers (also used from link.c / sensors.c while busy)         */
 /* ------------------------------------------------------------------------ */
@@ -54,6 +125,7 @@ void main_service(void) {
   uint64_t now = lp_now_ms();
   if (now >= next_tick_ms) {
     sensors_fast_tick(&g_r);
+    check_change();
     next_tick_ms += FAST_TICK_S * 1000u;
     if (next_tick_ms <= now) next_tick_ms = now + FAST_TICK_S * 1000u;
   }
@@ -124,6 +196,14 @@ static uint16_t make_frame(char *b, uint16_t sz) {
   n = frame_add(b, sz, n, "vs", g_pwr.vsolar_mv);
   n = frame_add(b, sz, n, "us", g_pwr.usb);
   n = frame_add(b, sz, n, "cs", g_pwr.charge);
+  n = frame_add(b, sz, n, "ed", (int32_t)link_last_on_ms());
+  n = frame_add(b, sz, n, "rr", last_reason);
+  n = frame_add(b, sz, n, "sc", charge_minutes_24h());
+  n = frame_add(b, sz, n, "vx", g_voc_restored);
+  if (energy_mah_day_10()) {
+    n = frame_add(b, sz, n, "ec", energy_mah_day_10());
+    if (!g_pwr.usb) n = frame_add(b, sz, n, "rd", energy_runtime_days_10(g_pwr.soc));
+  }
   if (r->valid & V_HIDS) {
     n = frame_add(b, sz, n, "t", r->t_c100);
     n = frame_add(b, sz, n, "h", r->rh_100);
@@ -133,6 +213,8 @@ static uint16_t make_frame(char *b, uint16_t sz) {
   if (r->valid & V_SOUND) {
     n = frame_add(b, sz, n, "la", r->la_10);
     n = frame_add(b, sz, n, "lx", r->lmax_10);
+    n = frame_add(b, sz, n, "l9", r->la90_10);
+    n = frame_add(b, sz, n, "l1", r->la10_10);
   }
   if (r->valid & V_AHT20) {
     n = frame_add(b, sz, n, "at", r->aht_t_c100);
@@ -170,17 +252,26 @@ static uint16_t make_frame(char *b, uint16_t sz) {
 /* one report                                                                 */
 /* ------------------------------------------------------------------------ */
 static void do_report(uint16_t local_maint_s) {
+  energy_update(); /* close the consumption period since the last report */
+  last_reason = local_maint_s ? RR_MAINT : next_reason;
+  next_reason = RR_SCHEDULED;
   power_measure(&g_pwr); /* rest voltage, before the ESP loads the battery */
   update_mode();
   sensors_power_policy(g_pwr.usb);
   cur_interval_s = policy_interval();
 
   g_r.valid &= ~V_SOUND;
-  if (sound_measure(&g_r.la_10, &g_r.lmax_10)) {
+  if (sound_measure(&g_r.la_10, &g_r.lmax_10, &g_r.la90_10, &g_r.la10_10)) {
     g_r.valid |= V_SOUND;
     g_present |= HAS_MIC;
   }
   sensors_report(&g_r, g_pwr.usb, g_pwr.soc);
+
+  /* snapshot for change detection */
+  rep_t = g_r.t_c100;
+  rep_rh = g_r.rh_100;
+  rep_voc = g_r.voc_index;
+  rep_valid = g_r.valid | 0x80000000u;
 
   maint_active = local_maint_s > 0;
   struct link_config cfg;
@@ -207,7 +298,8 @@ static void do_report(uint16_t local_maint_s) {
        g_pwr.soc, mode);
 
   cur_interval_s = policy_interval();
-  next_report_ms = lp_now_ms() + cur_interval_s * 1000u;
+  last_report_ms = lp_now_ms();
+  next_report_ms = last_report_ms + cur_interval_s * 1000u;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -234,6 +326,7 @@ static void handle_button(void) {
   } else {
     enum led_color c = g_pwr.usb ? LED_BLUE : g_pwr.soc >= 50 ? LED_GREEN : g_pwr.soc >= 20 ? LED_YELLOW : LED_RED;
     board_blink(c, 400);
+    next_reason = RR_BUTTON;
     if (mode != MODE_SURVIVAL || g_pwr.usb) do_report(0);
   }
 }
@@ -283,13 +376,17 @@ int main(void) {
       power_measure(&g_pwr);
       update_mode();
       sensors_power_policy(g_pwr.usb);
-      if (g_pwr.usb != was_usb) next_report_ms = lp_now_ms() + 2000;
+      if (g_pwr.usb != was_usb) {
+        next_report_ms = lp_now_ms() + 2000;
+        next_reason = RR_USB;
+      }
     }
 
     now = lp_now_ms();
     if (now >= next_power_ms) {
       uint8_t old = mode;
       power_measure(&g_pwr);
+      charge_tick();
       update_mode();
       /* say goodbye to HA once when entering survival, if there's energy left */
       if (mode == MODE_SURVIVAL && old != MODE_SURVIVAL && g_pwr.vbat_mv > 3550) do_report(0);

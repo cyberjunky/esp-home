@@ -19,7 +19,7 @@ esphome:
   min_version: 2025.10.0
   project:
     name: "wots.omgevingsmonitor"   # shown in HA as model "omgevingsmonitor" by "wots"
-    version: "1.0.1"
+    version: "1.2.0"
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -96,9 +96,17 @@ sensor:
     voc_raw: {name: "VOC raw"}
     sound_level: {name: "Sound level"}
     sound_level_max: {name: "Sound level max"}
+    sound_level_background: {name: "Sound level background (LA90)"}
+    sound_level_l10: {name: "Sound level LA10"}
+    dew_point: {name: "Dew point"}
+    absolute_humidity: {name: "Absolute humidity"}
     battery_voltage: {name: "Battery voltage"}
     battery_level: {name: "Battery"}
     solar_voltage: {name: "Solar voltage"}
+    solar_charging_time: {name: "Solar charging (24 h)"}
+    energy_consumption: {name: "Energy consumption"}
+    battery_runtime: {name: "Battery runtime without sun"}
+    report_duration: {name: "Report duration"}
     # Optional add-on sensors: the STM32 detects them automatically; uncomment
     # the ones you have fitted ("Detected sensors" in HA shows what it found).
     # aht20_temperature: {name: "AHT20 temperature"}
@@ -143,6 +151,7 @@ binary_sensor:
     usb_power: {name: "USB power"}
     charging: {name: "Charging"}
     maintenance_active: {name: "Maintenance (button)"}
+    voc_baseline_restored: {name: "VOC baseline restored"}
   - platform: homeassistant
     id: ha_maintenance
     entity_id: input_boolean.omgevingsmonitor_maintenance
@@ -151,6 +160,7 @@ binary_sensor:
 text_sensor:
   - platform: omgevingsmonitor
     power_mode: {name: "Power mode"}
+    report_reason: {name: "Report reason"}
     charger_state: {name: "Charger"}
     reset_cause: {name: "STM32 reset cause"}
     stm32_firmware: {name: "STM32 firmware"}

@@ -44,3 +44,36 @@ automation:
       - action: input_boolean.turn_off
         target:
           entity_id: input_boolean.omgevingsmonitor_maintenance
+
+# --- Battery life with sun ----------------------------------------------------
+# The device itself reports "Battery runtime without sun" (worst case). What the
+# sun really adds shows in the 24 h trend of the battery level:
+#   trend >= 0  -> the solar cell keeps up (shown as 365 days)
+#   trend <  0  -> days until the battery reaches the 10 % survival threshold
+sensor:
+  - platform: derivative
+    name: Omgevingsmonitor battery trend
+    unique_id: omgevingsmonitor_battery_trend
+    source: sensor.omgevingsmonitor_battery
+    unit_time: d
+    unit: "%/d"
+    time_window: "24:00:00"
+    round: 1
+
+template:
+  - sensor:
+      - name: Omgevingsmonitor battery life at current trend
+        unique_id: omgevingsmonitor_battery_life_trend
+        unit_of_measurement: d
+        icon: mdi:solar-power-variant-outline
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.omgevingsmonitor_battery')
+             and has_value('sensor.omgevingsmonitor_battery_trend')
+             and is_state('binary_sensor.omgevingsmonitor_usb_power', 'off') }}
+        state: >
+          {% set soc = states('sensor.omgevingsmonitor_battery') | float %}
+          {% set trend = states('sensor.omgevingsmonitor_battery_trend') | float %}
+          {% if trend >= 0 %}365
+          {% else %}{{ [((soc - 10) / -trend) | round(0), 365] | min }}
+          {% endif %}

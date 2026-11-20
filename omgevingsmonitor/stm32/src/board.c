@@ -7,6 +7,8 @@
  * standby current seen with the original firmware).
  */
 #include "board.h"
+#include "energy.h"
+#include "lowpower.h"
 
 volatile bool g_button_irq;
 volatile bool g_vusb_irq;
@@ -171,5 +173,10 @@ bool board_usb_present(void) {
 }
 
 void board_boost(bool on) {
+  static uint64_t on_since;
+  static bool is_on;
+  if (on && !is_on) on_since = lp_now_ms();
+  if (!on && is_on) energy_add(I_BOOST_UA, (uint32_t)(lp_now_ms() - on_since));
+  is_on = on;
   HAL_GPIO_WritePin(BOOST_EN_PORT, BOOST_EN_PIN, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }

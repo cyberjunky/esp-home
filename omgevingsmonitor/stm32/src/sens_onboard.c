@@ -5,6 +5,7 @@
  * SGP40: one humidity-compensated measurement (30 ms heater pulse), then
  * the heater is switched off again -> ~3 mA for 30 ms every 10 s.
  */
+#include "energy.h"
 #include "i2c_bus.h"
 #include "lowpower.h"
 #include "sensors.h"
@@ -56,6 +57,7 @@ bool sgp40_measure_raw(uint16_t rh_100, int16_t t_c100, uint16_t *raw) {
     ok = sensirion_read_words(BUS_ONBOARD, SGP40_ADDR, &w, 1);
   }
   sensirion_cmd(BUS_ONBOARD, SGP40_ADDR, 0x3615, 0, 0); /* heater off -> idle */
+  energy_add(I_HEATER_UA, 200);
   if (!ok || w == 0) return false;
   *raw = w;
   return true;

@@ -10,6 +10,7 @@ DIAG = ENTITY_CATEGORY_DIAGNOSTIC
 
 TEXTS = {
     "power_mode": ("set_power_mode_text_sensor", "mdi:solar-power-variant"),
+    "report_reason": ("set_report_reason_text_sensor", "mdi:help-circle-outline"),
     "charger_state": ("set_charger_text_sensor", "mdi:battery-charging"),
     "reset_cause": ("set_reset_cause_text_sensor", "mdi:restart-alert"),
     "stm32_firmware": ("set_firmware_text_sensor", "mdi:chip"),

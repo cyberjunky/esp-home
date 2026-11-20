@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "energy.h"
 #include "esp.h"
 #include "lowpower.h"
 #include "stm32l0xx_hal.h"
@@ -23,6 +24,9 @@
 #define BAUD 115200u
 
 extern void main_service(void); /* keeps sensor ticks running meanwhile */
+
+static uint32_t last_on_ms;
+uint32_t link_last_on_ms(void) { return last_on_ms; }
 
 static uint16_t crc16(const char *s, uint16_t n) {
   uint16_t crc = 0xFFFF;
@@ -105,7 +109,7 @@ static void parse_config(char *p, struct link_config *cfg) {
 
 enum link_result link_session(frame_fn make_frame, uint32_t refresh_ms, uint16_t timeout_s,
                               uint16_t local_maint_s, struct link_config *cfg) {
-  static char frame[320];
+  static char frame[448];
   memset(cfg, 0, sizeof *cfg);
 
   lp_inhibit_stop(true);
@@ -156,6 +160,8 @@ enum link_result link_session(frame_fn make_frame, uint32_t refresh_ms, uint16_t
 
   HAL_Delay(done ? 150 : 0); /* let ESPHome close the API connection cleanly */
   esp_power_off();
+  last_on_ms = HAL_GetTick() - t0;
+  energy_add(I_ESP_UA, last_on_ms);
   lp_inhibit_stop(false);
   if (done) return LINK_DONE;
   return heard ? LINK_TIMEOUT : LINK_NO_ESP;

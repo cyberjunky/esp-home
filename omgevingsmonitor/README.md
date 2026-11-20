@@ -19,15 +19,29 @@ cell through a Dutch winter, and it shows up in Home Assistant as a normal ESPHo
 | --- | --- | --- |
 | WSEN-HIDS (on board) | temperature, humidity | sampled every 10 s |
 | SGP40 (on board) | VOC index (Sensirion gas index algorithm), raw | sampled every 10 s, so the index stays valid |
-| ICS-43434 (on board) | sound level LAeq and LAmax, dB(A) | 2 s window per report |
-| Battery / solar / charger | voltage, %, solar voltage, charging, USB | every report |
+| ICS-43434 (on board) | sound level LAeq, LAmax, background LA90 and LA10, dB(A) | 4 s window per report |
+| Computed | dew point, absolute humidity | every report |
+| Battery / solar / charger | voltage, %, solar voltage, charging, USB, solar charging minutes (24 h) | every report |
+| Energy estimate | consumption (mAh/day), runtime without sun, report duration | every report |
 | AHT20 *(optional)* | temperature, humidity | every report |
 | BMP280 / BME280 *(optional)* | pressure, temperature (+ humidity) | every report |
 | ENS160 *(optional)* | AQI, TVOC, eCO2 | on USB power |
 | SEN50/54/55 *(optional)* | PM1/2.5/4/10, T/RH, VOC, NOx | continuously on USB; hourly PM on battery |
-| Diagnostics | power mode, interval, reset cause, I2C errors, failed reports, uptime, Wi-Fi RSSI, detected sensors | every report |
+| Diagnostics | power mode, report reason, interval, reset cause, I2C errors, failed reports, uptime, Wi-Fi RSSI, detected sensors, VOC baseline restored | every report |
 
 Optional sensors are detected at boot. If a sensor isn't fitted, nothing is published for it.
+
+Smart behaviour:
+
+* **Reports early on big changes**: a jump of 1.5 °C, 8 %RH or 80 VOC index points, or the VOC
+  index crossing 250, triggers a report right away instead of waiting for the interval (at most
+  4 per hour, not within 3 minutes of the previous report; only the VOC alarm in saving mode).
+* **VOC baseline survives resets and flashing**: the gas index algorithm's learned state is kept
+  in the RTC backup registers (no flash wear) and restored when it is less than 10 minutes old.
+* **Battery life**: the STM32 estimates its own consumption from measured on-times; the Home
+  Assistant package adds the 24 h battery trend and the battery life including the sun.
+
+<img src="docs/home-assistant.png" alt="The Omgevingsmonitor in Home Assistant" width="560">
 
 ## Energy design
 
@@ -36,10 +50,10 @@ Optional sensors are detected at boot. If a sensor isn't fitted, nothing is publ
 | Item | Estimate | Note |
 | --- | --- | --- |
 | Sleep floor (MCU Stop + RTC, LDO, sensors idle) | ~0.05–0.08 mA | **to be measured**; the original firmware drew ~2.3 mA |
-| VOC/T/RH tick, 45 ms every 10 s | ~0.4 mAh/day | SGP40 heater only on for 30 ms |
+| VOC/T/RH tick, ~0.25 s every 10 s | ~1.5 mAh/day | SGP40 hotplate heats 170 ms, then measures 30 ms |
 | One report (sound 2.4 s + ESP ~4 s at ~80 mA) | ~0.09 mAh | static IP makes it shorter |
-| **Total at 10 min interval** | **~15 mAh/day** | ≈ 110 days on 2000 mAh with no sun at all |
-| Total in "saving" (40 min) | ~5 mAh/day | |
+| **Total at 10 min interval** | **~16 mAh/day** | ≈ 110 days on 2000 mAh with no sun at all |
+| Total in "saving" (40 min) | ~6 mAh/day | |
 
 In practice, Wi-Fi time dominates. A static IP (`manual_ip` in the YAML) is the single biggest
 saving. The device also backs off by itself when Wi-Fi or HA is unreachable, and enters a
