@@ -1,0 +1,46 @@
+# Home Assistant package: helpers that let HA steer the Omgevingsmonitor.
+#
+# Install: copy to <config>/packages/ and add to configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Values are picked up the next time the device reports (it sleeps in between).
+
+input_number:
+  omgevingsmonitor_interval_battery:
+    name: Omgevingsmonitor interval (battery)
+    icon: mdi:timer-cog-outline
+    min: 1
+    max: 180
+    step: 1
+    initial: 10
+    unit_of_measurement: min
+    mode: box
+  omgevingsmonitor_interval_usb:
+    name: Omgevingsmonitor interval (USB)
+    icon: mdi:timer-cog-outline
+    min: 1
+    max: 60
+    step: 1
+    initial: 1
+    unit_of_measurement: min
+    mode: box
+
+input_boolean:
+  omgevingsmonitor_maintenance:
+    name: Omgevingsmonitor maintenance (keep Wi-Fi on for OTA)
+    icon: mdi:wrench-clock
+
+automation:
+  - id: omgevingsmonitor_maintenance_auto_off
+    alias: Omgevingsmonitor - maintenance off after 30 min
+    description: Never leave the ESP awake by accident - it drains the battery.
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.omgevingsmonitor_maintenance
+        to: "on"
+        for: "00:30:00"
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.omgevingsmonitor_maintenance

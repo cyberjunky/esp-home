@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <title>Omgevingsmonitor architecture</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#333;stroke-width:1.5;rx:8}
+      .mcu{fill:#e8f1fb;stroke:#2b6cb0;stroke-width:2}
+      .esp{fill:#eaf7ee;stroke:#2f855a;stroke-width:2}
+      .pwr{fill:#fff7e6;stroke:#c05621;stroke-width:1.5}
+      .opt{fill:#f7f7f7;stroke:#888;stroke-width:1.2;stroke-dasharray:5 3}
+      .ha{fill:#e6f6fb;stroke:#0b7a99;stroke-width:2}
+      .t{font-weight:600;font-size:14}
+      .s{fill:#555;font-size:12}
+      .l{stroke:#444;stroke-width:1.6;fill:none;marker-end:url(#a)}
+      .lp{stroke:#c05621;stroke-width:1.8;fill:none;marker-end:url(#a)}
+      .lb{fill:#444;font-size:11.5}
+    </style>
+  </defs>
+  <rect width="960" height="600" fill="#ffffff"/>
+
+  <!-- power -->
+  <rect class="pwr" x="20" y="30" width="170" height="60" rx="8"/>
+  <text class="t" x="35" y="55">Solar cell 0.5-1 Wp</text>
+  <text class="s" x="35" y="75">+ USB-C 5 V</text>
+  <rect class="pwr" x="20" y="120" width="170" height="60" rx="8"/>
+  <text class="t" x="35" y="145">MCP73831 charger</text>
+  <text class="s" x="35" y="165">STAT -&gt; PC9 (tri-state)</text>
+  <rect class="pwr" x="20" y="210" width="170" height="60" rx="8"/>
+  <text class="t" x="35" y="235">LiPo 2000 mAh</text>
+  <text class="s" x="35" y="255">sensed on PC4 (1:2)</text>
+  <path class="lp" d="M105,90 V118"/>
+  <path class="lp" d="M105,180 V208"/>
+
+  <rect class="pwr" x="20" y="320" width="170" height="52" rx="8"/>
+  <text class="t" x="35" y="342">TPS7A02 3.0 V LDO</text>
+  <text class="s" x="35" y="360">always on, 25 nA Iq</text>
+  <rect class="pwr" x="20" y="400" width="170" height="52" rx="8"/>
+  <text class="t" x="35" y="422">TLV62568 3 V buck</text>
+  <text class="s" x="35" y="440">EN = PC11, PG = PA8</text>
+  <rect class="pwr" x="20" y="480" width="170" height="52" rx="8"/>
+  <text class="t" x="35" y="502">XC9140 5 V boost</text>
+  <text class="s" x="35" y="520">EN = PC12</text>
+  <path class="lp" d="M60,270 V318"/>
+  <path class="lp" d="M40,270 V300 H10 V426 H18"/>
+  <path class="lp" d="M10,426 V506 H18"/>
+
+  <!-- MCU -->
+  <rect class="mcu" x="300" y="200" width="250" height="190" rx="10"/>
+  <text class="t" x="315" y="225">STM32L072RZ</text>
+  <text class="s" x="315" y="247">Stop mode + RTC (LSE 32.768 kHz)</text>
+  <text class="s" x="315" y="267">every 10 s: T/RH + SGP40 VOC index</text>
+  <text class="s" x="315" y="287">every report: dB(A), optional sensors</text>
+  <text class="s" x="315" y="307">battery / solar / charger policy</text>
+  <text class="s" x="315" y="327">switches ESP and 5 V rail</text>
+  <text class="s" x="315" y="347">IWDG watchdog, I2C bus recovery</text>
+  <text class="s" x="315" y="367">USB DFU (ROM) + USB&#8596;ESP bridge</text>
+  <path class="lp" d="M190,346 H298"/>
+
+  <!-- on-board sensors -->
+  <rect class="box" x="300" y="30" width="120" height="58" rx="8"/>
+  <text class="t" x="312" y="54">WSEN-HIDS</text>
+  <text class="s" x="312" y="73">T / RH  0x44</text>
+  <rect class="box" x="430" y="30" width="120" height="58" rx="8"/>
+  <text class="t" x="442" y="54">SGP40</text>
+  <text class="s" x="442" y="73">VOC  0x59</text>
+  <rect class="box" x="560" y="30" width="130" height="58" rx="8"/>
+  <text class="t" x="572" y="54">ICS-43434</text>
+  <text class="s" x="572" y="73">I2S mic, SPI2</text>
+  <rect class="opt" x="300" y="110" width="250" height="58" rx="8"/>
+  <text class="t" x="312" y="133">optional on I2C1</text>
+  <text class="s" x="312" y="153">AHT20, BMP/BME280, ENS160</text>
+  <path class="l" d="M360,88 V108"/>
+  <path class="l" d="M490,88 V108"/>
+  <text class="lb" x="434" y="188">I2C1 PB6/PB7</text>
+  <path class="l" d="M425,168 V198"/>
+  <path class="l" d="M625,88 V230 H552" />
+  <text class="lb" x="632" y="140">I2S</text>
+  <text class="lb" x="632" y="155">PB12/13/15</text>
+
+  <!-- SEN5x -->
+  <rect class="opt" x="300" y="470" width="250" height="62" rx="8"/>
+  <text class="t" x="312" y="495">Sensirion SEN50/54/55 (optional)</text>
+  <text class="s" x="312" y="515">PM1-10, RH/T, VOC, NOx  0x69</text>
+  <path class="lp" d="M190,506 H298"/>
+  <path class="l" d="M425,392 V468"/>
+  <text class="lb" x="432" y="440">I2C2 PB10/PB11</text>
+
+  <!-- ESP -->
+  <rect class="esp" x="650" y="250" width="200" height="110" rx="10"/>
+  <text class="t" x="665" y="275">ESP32-C3-WROOM-02U</text>
+  <text class="s" x="665" y="297">ESPHome + omgevingsmonitor</text>
+  <text class="s" x="665" y="317">powered only while reporting</text>
+  <text class="s" x="665" y="337">(~3-6 s per report)</text>
+  <path class="l" d="M552,290 H648"/>
+  <path class="l" d="M648,312 H552"/>
+  <text class="lb" x="560" y="282">$D data frame</text>
+  <text class="lb" x="560" y="330">$H / $C / $Z</text>
+  <text class="lb" x="565" y="264">LPUART1</text>
+  <path class="lp" d="M190,426 H600 V380 H748 V362"/>
+
+  <!-- HA -->
+  <rect class="ha" x="650" y="440" width="200" height="92" rx="10"/>
+  <text class="t" x="665" y="465">Home Assistant</text>
+  <text class="s" x="665" y="487">native ESPHome API (Wi-Fi)</text>
+  <text class="s" x="665" y="507">helpers: interval, maintenance</text>
+  <path class="l" d="M760,362 V438"/>
+  <path class="l" d="M740,438 V362"/>
+</svg>

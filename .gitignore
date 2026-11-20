@@ -1,0 +1,32 @@
+# Wi-Fi, API and OTA credentials: never commit these.
+secrets.yaml
+**/secrets.yaml
+
+# ESPHome build output and local state
+.esphome/
+**/.esphome/
+.pioenvs/
+.piolibdeps/
+
+# PlatformIO build output (STM32 firmware)
+.pio/
+**/.pio/
+
+# Device backups (may contain Wi-Fi credentials)
+backups/
+**/backups/
+
+# Third-party images/PDFs without a redistribution license (see the folder's README)
+**/docs/third-party/*
+!**/docs/third-party/README.md
+
+# Python
+.venv/
+__pycache__/
+
+# Editors and assistants
+.vscode/
+.idea/
+CLAUDE.md
+CLAUDE.local.md
+.claude/

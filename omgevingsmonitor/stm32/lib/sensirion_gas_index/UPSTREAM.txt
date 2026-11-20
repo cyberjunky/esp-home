@@ -1,0 +1,2 @@
+2ef9f13d225e8a0dedd3ff42dd229af4dbb1aae4 Mon Feb 2 15:12:41 2026 +0100
+Source: https://github.com/Sensirion/gas-index-algorithm (BSD-3-Clause)

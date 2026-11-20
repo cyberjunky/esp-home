@@ -1,0 +1,27 @@
+{
+  "build": {
+    "cpu": "cortex-m0plus",
+    "extra_flags": "-DSTM32L0 -DSTM32L072xx",
+    "f_cpu": "16000000L",
+    "mcu": "stm32l072rzt6",
+    "product_line": "STM32L072xx",
+    "variant": "STM32L0xx/L072R(B-Z)T_L073R(B-Z)T_L083R(B-Z)T"
+  },
+  "debug": {
+    "default_tools": ["stlink"],
+    "jlink_device": "STM32L072RZ",
+    "openocd_target": "stm32l0",
+    "svd_path": "STM32L0x2.svd"
+  },
+  "frameworks": ["stm32cube", "cmsis"],
+  "name": "De Omgevingsmonitor (STM32L072RZ)",
+  "upload": {
+    "maximum_ram_size": 20480,
+    "maximum_size": 196608,
+    "protocol": "dfu",
+    "protocols": ["dfu", "stlink", "jlink", "cmsis-dap", "blackmagic"],
+    "offset_address": "0x08000000"
+  },
+  "url": "https://wiki.deomgevingsmonitor.nl/",
+  "vendor": "Kitt Engineering"
+}
