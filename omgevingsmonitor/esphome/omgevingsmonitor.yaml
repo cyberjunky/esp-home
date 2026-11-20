@@ -34,6 +34,9 @@ esp32:
       # faster cold boot - every millisecond awake costs battery
       CONFIG_BOOTLOADER_SKIP_VALIDATE_ON_POWER_ON: y
 
+# Your own network settings (static IP etc.): every local/*.yaml is merged in.
+packages: !include_dir_named local
+
 external_components:
   - source:
       type: local
@@ -59,12 +62,7 @@ wifi:
   power_save_mode: none # we are on for seconds only, so be quick
   reboot_timeout: 0s
   # A static IP saves the DHCP round trip on every report (~0.5-2 s).
-  # Recommended for battery life - uncomment and adapt:
-  # manual_ip:
-  #   static_ip: 192.168.1.60
-  #   gateway: 192.168.1.1
-  #   subnet: 255.255.255.0
-  #   dns1: 192.168.1.1
+  # Recommended for battery life: put it in local/network.yaml (see local/README.md).
 
 # Marks the device as "sleepy" for Home Assistant, so its entities keep their
 # last values while the ESP is powered down. It never sleeps by itself: the

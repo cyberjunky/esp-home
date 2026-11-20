@@ -30,3 +30,6 @@ __pycache__/
 CLAUDE.md
 CLAUDE.local.md
 .claude/
+
+# Local ESPHome overrides (static IP etc.)
+**/esphome/local/*.yaml

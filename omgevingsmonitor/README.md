@@ -55,8 +55,9 @@ Smart behaviour:
 | **Total at 10 min interval** | **~16 mAh/day** | ≈ 110 days on 2000 mAh with no sun at all |
 | Total in "saving" (40 min) | ~6 mAh/day | |
 
-In practice, Wi-Fi time dominates. A static IP (`manual_ip` in the YAML) is the single biggest
-saving. The device also backs off by itself when Wi-Fi or HA is unreachable, and enters a
+In practice, Wi-Fi time dominates. A fixed address is the single biggest saving: either a DHCP
+reservation in your router, or a static IP in `esphome/local/network.yaml` (see
+[esphome/local/README.md](esphome/local/README.md)), which also skips the DHCP round trip. The device also backs off by itself when Wi-Fi or HA is unreachable, and enters a
 survival mode (no radio) below 10 % until the sun brings it back to 20 %.
 
 ## What changed compared with the original firmware
