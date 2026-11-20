@@ -41,7 +41,7 @@ Smart behaviour:
 * **Battery life**: the STM32 estimates its own consumption from measured on-times; the Home
   Assistant package adds the 24 h battery trend and the battery life including the sun.
 
-<img src="docs/home-assistant.png" alt="The Omgevingsmonitor in Home Assistant" width="560">
+<img src="docs/home-assistant.png" alt="The Omgevingsmonitor in Home Assistant" width="680">
 
 ## Energy design
 
