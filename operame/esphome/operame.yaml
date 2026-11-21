@@ -33,7 +33,7 @@ logger:
 
 api:
   encryption:
-    key: !secret api_key
+    key: !secret api_encryption_key
 
 # OTA is authenticated and encrypted with the API key (no separate OTA password).
 # Coming from the old configuration (Arduino + OTA password): flash this version

@@ -56,7 +56,7 @@ cd operame/esphome
 esphome run operame.yaml --device COM5   # your T-Display's serial port
 ```
 
-Keep the same `api_key`, then Home Assistant reconnects without re-adopting. After this, updates
+Keep the same `api_encryption_key`, then Home Assistant reconnects without re-adopting. After this, updates
 work over the air again. The `esphome_ota` entry in `secrets.yaml` is no longer used.
 
 Other changes from the old configuration: the display uses the `mipi_spi` platform (`st7789v` is
