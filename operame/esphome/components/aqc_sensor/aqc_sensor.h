@@ -1,91 +1,74 @@
 #pragma once
 
-#include "esphome/core/component.h"
-#include "esphome/core/log.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/core/component.h"
+#include "esphome/core/log.h"
 
 namespace esphome {
 namespace aqc_sensor {
 
+static const char *const TAG = "aqc";
+
+// The AQC uses the MH-Z19 frame layout, but its read command is 0xC5 instead of 0x86.
+// Request:  FF 01 C5 00 00 00 00 00 3A
+// Response: FF 86 <CO2 high> <CO2 low> xx xx xx xx <checksum>
+static const uint8_t AQC_READ_CMD[9] = {0xFF, 0x01, 0xC5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A};
+static const uint32_t AQC_RESPONSE_MS = 100;
+static const int AQC_WARMING_UP = 9999;
+
 class AQCSensor : public PollingComponent, public uart::UARTDevice {
  public:
-  void set_co2_sensor(sensor::Sensor *co2_sensor) { co2_sensor_ = co2_sensor; }
+  void set_co2_sensor(sensor::Sensor *co2_sensor) { this->co2_sensor_ = co2_sensor; }
 
-  void setup() override {
-    // Nothing special needed for setup
+  void dump_config() override {
+    ESP_LOGCONFIG(TAG, "AQC CO2 sensor");
+    LOG_UPDATE_INTERVAL(this);
+    LOG_SENSOR("  ", "CO2", this->co2_sensor_);
   }
 
   void update() override {
-    // AQC command to read CO2 (different from MH-Z19's 0x86)
-    const uint8_t command[9] = {0xFF, 0x01, 0xC5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3A};
-    uint8_t response[9];
-
-    // Flush any pending data
-    while (this->available()) {
-      this->read();
+    // Drop anything stale, send the read command and pick up the answer without blocking the loop.
+    uint8_t c;
+    while (this->available() && this->read_byte(&c)) {
     }
-
-    // Send command
-    this->write_array(command, sizeof(command));
-    this->flush();
-
-    // Small delay for sensor to respond
-    delay(50);
-
-    // Read response
-    if (this->available() < 9) {
-      ESP_LOGW("aqc", "Not enough data available from AQC sensor");
-      delay(50);
-      if (this->available() < 9) {
-        return;
-      }
-    }
-
-    size_t bytes_read = 0;
-    for (int i = 0; i < 9 && this->available(); i++) {
-      response[i] = this->read();
-      bytes_read++;
-    }
-
-    if (bytes_read != 9) {
-      ESP_LOGW("aqc", "Failed to read 9 bytes from AQC sensor, got %u", (unsigned) bytes_read);
-      return;
-    }
-
-    // Validate response header
-    if (response[0] != 0xFF || response[1] != 0x86) {
-      ESP_LOGW("aqc", "Invalid response header from AQC: 0x%02X 0x%02X", response[0], response[1]);
-      return;
-    }
-
-    // Verify checksum
-    uint8_t checksum = 0xFF;
-    for (int i = 0; i < 8; i++) {
-      checksum -= response[i];
-    }
-
-    if (response[8] != checksum) {
-      ESP_LOGW("aqc", "Checksum mismatch: expected 0x%02X, got 0x%02X", checksum, response[8]);
-      return;
-    }
-
-    // Extract CO2 value (bytes 2 and 3, big-endian)
-    int co2 = (response[2] << 8) | response[3];
-
-    // The AQC returns 9999 while it initialises (400 ppm readings pass; the YAML filters range)
-    if (co2 == 9999) {
-      ESP_LOGI("aqc", "AQC sensor still initializing (got %d ppm)", co2);
-      return;
-    }
-
-    ESP_LOGD("aqc", "AQC CO2: %d ppm", co2);
-    if (this->co2_sensor_ != nullptr) {
-      this->co2_sensor_->publish_state(co2);
-    }
+    this->write_array(AQC_READ_CMD, sizeof(AQC_READ_CMD));
+    this->set_timeout("read", AQC_RESPONSE_MS, [this]() { this->read_response_(); });
   }
 
  protected:
+  void read_response_() {
+    uint8_t r[9];
+    if (this->available() < static_cast<int>(sizeof(r)) || !this->read_array(r, sizeof(r))) {
+      ESP_LOGW(TAG, "No complete answer from the AQC sensor (%d bytes)", this->available());
+      this->status_set_warning();
+      return;
+    }
+    if (r[0] != 0xFF || r[1] != 0x86) {
+      ESP_LOGW(TAG, "Invalid response header: 0x%02X 0x%02X", r[0], r[1]);
+      this->status_set_warning();
+      return;
+    }
+    // MH-Z19 checksum: 0xFF - (sum of bytes 1..7) + 1
+    uint8_t sum = 0;
+    for (int i = 1; i < 8; i++) sum += r[i];
+    const uint8_t checksum = static_cast<uint8_t>(0xFF - sum + 1);
+    if (r[8] != checksum) {
+      ESP_LOGW(TAG, "Checksum mismatch: expected 0x%02X, got 0x%02X", checksum, r[8]);
+      this->status_set_warning();
+      return;
+    }
+    this->status_clear_warning();
+
+    const int co2 = (r[2] << 8) | r[3];
+    if (co2 == AQC_WARMING_UP) {
+      ESP_LOGI(TAG, "Sensor is still warming up");
+      return;
+    }
+    ESP_LOGD(TAG, "CO2: %d ppm", co2);
+    if (this->co2_sensor_ != nullptr) this->co2_sensor_->publish_state(co2);
+  }
+
   sensor::Sensor *co2_sensor_{nullptr};
 };
 

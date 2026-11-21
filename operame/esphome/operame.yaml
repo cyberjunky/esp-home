@@ -1,26 +1,24 @@
 # =============================================================================
-# Operame AQC Sensor - Custom ESPHome Component
+# Operame CO2 meter (TTGO T-Display) with the AQC CO2 sensor
 # =============================================================================
 #
-# The AQC-0-0-0-0 sensor uses a different UART protocol than the MH-Z19.
-# This custom sensor component reads CO2 values from the AQC sensor.
-#
-# Protocol difference:
-# - MH-Z19 uses command: 0xFF 0x01 0x86 ... (response byte 1 = 0x86)
-# - AQC uses command:    0xFF 0x01 0xC5 ... (response byte 1 = 0x86, different checksum)
+# The AQC uses the MH-Z19 frame layout but a different read command
+# (0xFF 0x01 0xC5 ... instead of 0xFF 0x01 0x86 ...), so the stock mhz19
+# component can't read it. The aqc_sensor external component in
+# components/aqc_sensor/ does.
 #
 # =============================================================================
 
 substitutions:
-  device_name: operame
+  device_name: operame-hobbykamer
   friendly_name: "CO2 Level"
   co2_warning: "700"
   co2_critical: "800"
 
 esphome:
   name: ${device_name}
+  min_version: 2026.9.0
 
-# Load external AQC sensor component
 external_components:
   - source:
       type: local
@@ -29,7 +27,20 @@ external_components:
 esp32:
   board: esp32dev
   framework:
-    type: arduino
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+# OTA is authenticated and encrypted with the API key (no separate OTA password).
+# Coming from the old configuration (Arduino + OTA password): flash this version
+# once over USB, see README.md.
+ota:
+  - platform: esphome
+    encryption: {}
 
 wifi:
   ssid: !secret wifi_ssid
@@ -40,29 +51,18 @@ wifi:
 
 captive_portal:
 
-# Enable Improv via Serial for web flasher Wi-Fi setup
+# Wi-Fi setup from the ESPHome web flasher
 improv_serial:
 
-api:
-  encryption:
-    key: !secret api_key
-
-ota:
-  - platform: esphome
-    password: !secret esphome_ota
-
-logger:
-
-# UART for AQC sensor (same pins as MH-Z19)
+# =============================================================================
+# AQC CO2 sensor (UART, same pins as the MH-Z19)
+# =============================================================================
 uart:
   id: uart_aqc
   rx_pin: GPIO27
   tx_pin: GPIO26
   baud_rate: 9600
 
-# =============================================================================
-# AQC CO2 Sensor (External Component)
-# =============================================================================
 sensor:
   - platform: aqc_sensor
     uart_id: uart_aqc
@@ -81,116 +81,124 @@ sensor:
   - platform: wifi_signal
     name: "WiFi Signal"
     update_interval: 60s
+    entity_category: diagnostic
 
   - platform: uptime
     name: "Uptime"
     update_interval: 60s
+    entity_category: diagnostic
 
 # =============================================================================
-# Display (TTGO T-Display), buttons and diagnostics
+# Display (TTGO T-Display, ST7789V 135x240)
 # =============================================================================
 spi:
   clk_pin: GPIO18
   mosi_pin: GPIO19
 
+# Backlight on GPIO4, dimmable from Home Assistant
+output:
+  - platform: ledc
+    pin: GPIO4
+    id: backlight_pwm
+
+light:
+  - platform: monochromatic
+    name: "Backlight"
+    output: backlight_pwm
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 0s
+    entity_category: config
+
 color:
   - id: color_black
-    red: 0%
-    green: 0%
-    blue: 0%
+    hex: "000000"
   - id: color_white
-    red: 100%
-    green: 100%
-    blue: 100%
+    hex: "FFFFFF"
   - id: color_green
-    red: 0%
-    green: 100%
-    blue: 0%
+    hex: "00FF00"
   - id: color_yellow
-    red: 100%
-    green: 100%
-    blue: 0%
+    hex: "FFFF00"
   - id: color_red
-    red: 100%
-    green: 0%
-    blue: 0%
+    hex: "FF0000"
   - id: color_blue
-    red: 0%
-    green: 0%
-    blue: 100%
+    hex: "0000FF"
 
 font:
   - file: "gfonts://Roboto@700"
     id: font_ppm
     size: 72
+    glyphs: "0123456789"
   - file: "gfonts://Roboto"
     id: font_label
     size: 20
 
 display:
-  - platform: st7789v
+  - platform: mipi_spi
     id: ttgo_display
-    model: TTGO TDisplay 135x240
-    backlight_pin: GPIO4
-    cs_pin: GPIO5
-    dc_pin: GPIO16
+    model: T-DISPLAY
+    # CS on GPIO5 (strapping pin) is the board's wiring
+    cs_pin:
+      number: GPIO5
+      ignore_strapping_warning: true
     reset_pin: GPIO23
     rotation: 90
     update_interval: 1s
     lambda: |-
-      float co2 = id(co2_value).state;
-      Color bg_color;
-      Color text_color;
-      
-      if (isnan(co2) || co2 == 0) {
-        bg_color = id(color_blue);
-        text_color = id(color_white);
-        it.fill(bg_color);
-        it.printf(it.get_width()/2, it.get_height()/2, id(font_label), text_color, TextAlign::CENTER, "Warming up...");
+      const float co2 = id(co2_value).state;
+      const int cx = it.get_width() / 2;
+      const int cy = it.get_height() / 2;
+
+      if (std::isnan(co2) || co2 == 0) {
+        it.fill(id(color_blue));
+        it.printf(cx, cy, id(font_label), id(color_white), TextAlign::CENTER, "Warming up...");
         return;
       }
-      
+
+      Color bg_color = id(color_black);
+      Color text_color = id(color_green);
       if (co2 >= ${co2_critical}) {
         bg_color = id(color_red);
         text_color = id(color_white);
       } else if (co2 >= ${co2_warning}) {
         bg_color = id(color_yellow);
         text_color = id(color_black);
-      } else {
-        bg_color = id(color_black);
-        text_color = id(color_green);
       }
-      
+
       it.fill(bg_color);
-      if (id(wifi_connected).state) {
+      // Blue frame: Home Assistant is connected
+      if (id(api_connected).state) {
         it.rectangle(0, 0, it.get_width(), it.get_height(), id(color_blue));
       }
-      it.printf(it.get_width()/2, it.get_height()/2 - 10, id(font_ppm), text_color, TextAlign::CENTER, "%.0f", co2);
-      it.printf(it.get_width()/2, it.get_height()/2 + 40, id(font_label), text_color, TextAlign::CENTER, "ppm");
+      it.printf(cx, cy - 10, id(font_ppm), text_color, TextAlign::CENTER, "%.0f", co2);
+      it.printf(cx, cy + 40, id(font_label), text_color, TextAlign::CENTER, "ppm");
 
+# =============================================================================
+# Buttons and diagnostics
+# =============================================================================
 binary_sensor:
   - platform: status
     name: "Status"
-    id: wifi_connected
+    id: api_connected
 
+  # GPIO0 is the BOOT button (strapping pin), only read after boot
   - platform: gpio
     id: button_0
     pin:
       number: GPIO0
+      ignore_strapping_warning: true
       inverted: true
       mode:
         input: true
         pullup: true
     name: "Button 0"
 
+  # GPIO35 is input-only; the T-Display has an external pull-up
   - platform: gpio
     id: button_1
     pin:
       number: GPIO35
       inverted: true
     name: "Button 1"
-
-# Backlight is controlled by display component on GPIO4
 
 button:
   - platform: restart
@@ -200,5 +208,7 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: "IP Address"
+      entity_category: diagnostic
   - platform: version
     name: "ESPHome Version"
+    entity_category: diagnostic
