@@ -8,7 +8,6 @@ fitted with the **AQC** CO2 sensor instead of the MH-Z19.
   connected.
 * CO2, Wi-Fi signal, uptime, IP address, ESPHome version and both buttons in Home Assistant, plus
   a restart button and a dimmable display backlight.
-* Wi-Fi fallback access point with captive portal, and Improv over serial for the web flasher.
 
 ## Hardware
 
