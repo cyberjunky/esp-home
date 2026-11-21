@@ -8,11 +8,18 @@ share a version number.
 
 ### Fixed
 
-- Home Assistant showed all entities as unavailable between reports. The STM32 cut the ESP's
-  power while the API connection was still open, so HA saw an unexpected disconnect. The ESP now
-  closes the API connection cleanly (and waits for HA to acknowledge, max 1.5 s) before it tells
-  the STM32 to switch it off; HA then keeps the values of this deep-sleep device. ESPHome only;
-  the STM32 firmware stays at 1.2.0.
+ESPHome only; the STM32 firmware stays at 1.2.0. Both issues came from the STM32 cutting the
+ESP's power without ESPHome's normal shutdown:
+
+- Home Assistant showed all entities as unavailable between reports: it saw an unexpected
+  disconnect. The ESP now closes the API connection cleanly (and waits for HA to acknowledge,
+  max 1.5 s) before it tells the STM32 to switch it off; HA then keeps the values of this
+  deep-sleep device.
+- OTA updates were rolled back on the next wake unless they ran in a 15-minute maintenance
+  session: the new app image was never confirmed (ESPHome does that after 60 s or on a clean
+  shutdown). The ESP now confirms the running image after each successful report.
+- During a button-started maintenance session the API stays open (OTA, `esphome logs`); at the
+  end of it HA sees one unannounced disconnect until the next report.
 
 ## 1.2.0 - 2026-11-20
 

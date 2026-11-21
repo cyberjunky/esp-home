@@ -66,7 +66,8 @@ class OmgevingsmonitorComponent : public Component, public uart::UARTDevice {
   uint32_t connected_at_{0};
   uint32_t last_cfg_{0};
   uint32_t last_done_{0};
-  uint32_t closing_since_{0};  // clean API disconnect started (0 = not yet)
+  uint32_t closing_since_{0};
+  bool stm_maint_{false};  // STM32 runs a local (button) maintenance session  // clean API disconnect started (0 = not yet)
   bool cfg_sent_{false};
   bool last_maint_{false};
   uint32_t ha_settle_ms_{1200};

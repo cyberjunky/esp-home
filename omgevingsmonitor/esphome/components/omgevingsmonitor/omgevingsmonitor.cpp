@@ -10,6 +10,9 @@
 #ifdef USE_API
 #include "esphome/components/api/api_server.h"
 #endif
+#ifdef USE_ESP32
+#include <esp_ota_ops.h>
+#endif
 
 namespace esphome {
 namespace omgevingsmonitor {
@@ -95,15 +98,15 @@ void OmgevingsmonitorComponent::loop() {
   }
 
   if (this->closing_since_ != 0) {
-    // Wait until Home Assistant acknowledged the disconnect, so it records an *expected*
-    // disconnect and keeps our entities available while we are powered off.
+    // Wait until HA acknowledged the disconnect (it then records an *expected* disconnect), then
+    // tell the STM32 it may switch us off, repeated until it does.
     bool closed = true;
 #ifdef USE_API
     closed = api::global_api_server == nullptr || !api::global_api_server->is_connected();
 #endif
     if ((closed || now - this->closing_since_ >= CLOSE_TIMEOUT_MS) && now - this->last_done_ >= DONE_REPEAT_MS) {
-      // Home Assistant has our states and knows we are going to sleep: switch us off.
       this->send_("Z");
+      this->flush();
       this->last_done_ = now;
     }
     return;
@@ -136,14 +139,29 @@ void OmgevingsmonitorComponent::loop() {
     this->last_cfg_ = now;
   }
 
-  if (!maint) {
-    // Home Assistant has our states. Close the API connection cleanly before the STM32 cuts
-    // power: a dropped connection makes HA mark a deep-sleep device's entities unavailable.
+  // Stay connected during maintenance, whether HA asked for it or the button started it on the
+  // STM32 (OTA, esphome logs). The C line above only carries HA's request.
+  if (!maint && !this->stm_maint_) {
+    // Home Assistant has our states. A hard power cut skips two things ESPHome relies on, so do
+    // them here (not via run_safe_shutdown_hooks: that also deletes the UART driver we need for Z):
+    //  - confirm the app image, or the bootloader rolls back every OTA update on the next wake;
+    //  - close the API cleanly, or HA marks this deep-sleep device's entities unavailable.
     ESP_LOGI(TAG, "Report done, disconnecting from Home Assistant");
+#ifdef USE_ESP32
+    if (esp_ota_get_running_partition() == esp_ota_get_boot_partition())
+      esp_ota_mark_app_valid_cancel_rollback();
+#endif
 #ifdef USE_API
     if (api::global_api_server != nullptr) api::global_api_server->on_shutdown();
 #endif
     this->closing_since_ = now ? now : 1;
+  }
+  if (!maint && this->stm_maint_ && now - this->last_done_ >= DONE_REPEAT_MS) {
+    // Button maintenance: the STM32 switches us off when its timer ends and only counts the
+    // report as delivered if it got Z. Keep the API open meanwhile (safe_mode confirms the app
+    // image after 60 s); HA will see one unannounced disconnect at the end.
+    this->send_("Z");
+    this->last_done_ = now;
   }
 }
 
@@ -224,7 +242,10 @@ void OmgevingsmonitorComponent::handle_data_(char *payload) {
 #ifdef USE_BINARY_SENSOR
     if (strcmp(key, "us") == 0 && this->usb_bs_) this->usb_bs_->publish_state(v != 0);
     if (strcmp(key, "cs") == 0 && this->charging_bs_) this->charging_bs_->publish_state(v == 1);
-    if (strcmp(key, "mt") == 0 && this->maint_bs_) this->maint_bs_->publish_state(v != 0);
+    if (strcmp(key, "mt") == 0) {
+      this->stm_maint_ = v != 0;
+      if (this->maint_bs_) this->maint_bs_->publish_state(v != 0);
+    }
     if (strcmp(key, "vx") == 0 && this->voc_restored_bs_) this->voc_restored_bs_->publish_state(v != 0);
 #endif
     if (strcmp(key, "md") == 0) mode = static_cast<int>(v);
