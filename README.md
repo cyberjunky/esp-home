@@ -28,7 +28,14 @@ optional AHT20, BMP/BME280, ENS160 and Sensirion SEN5x particulate sensor.
 
 ### [Operame](operame/)
 
-CO2 monitor (Operame). Coming soon.
+![ESPHome](https://img.shields.io/badge/ESPHome-2026.11-blue.svg?style=for-the-badge)
+![ESP32](https://img.shields.io/badge/ESP32-TTGO_T--Display-green.svg?style=for-the-badge)
+
+ESPHome firmware for the Operame CO2 meter (TTGO T-Display) with the AQC CO2 sensor, which uses
+a different UART command than the MH-Z19. CO2 in ppm on a colour-coded display (green, yellow,
+red) and in Home Assistant.
+
+[:books: Documentation](operame/README.md)
 
 ## Layout
 
@@ -51,7 +58,8 @@ CO2 monitor (Operame). Coming soon.
 | [`omgevingsmonitor/homeassistant/`](omgevingsmonitor/homeassistant/) | package with helpers to set the interval and maintenance mode from Home Assistant |
 | [`omgevingsmonitor/docs/`](omgevingsmonitor/docs/) | architecture, protocol, hardware notes and flashing guide |
 | [`omgevingsmonitor/tools/`](omgevingsmonitor/tools/) | design script for the A-weighting filter |
-| [`operame/`](operame/) | Operame CO2 monitor (files follow) |
+| [`operame/`](operame/) | Operame CO2 monitor |
+| [`operame/esphome/`](operame/esphome/) | `operame.yaml` and the `aqc_sensor` external component |
 
 ## Using a project
 
