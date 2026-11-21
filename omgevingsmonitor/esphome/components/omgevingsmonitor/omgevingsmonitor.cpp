@@ -20,6 +20,7 @@ static const uint32_t HELLO_INTERVAL_MS = 250;
 static const uint32_t DONE_REPEAT_MS = 500;
 static const uint32_t MAINT_REFRESH_MS = 60000;
 static const uint16_t MAINT_SECONDS = 900;
+static const uint32_t CLOSE_TIMEOUT_MS = 1500;
 
 static uint16_t crc16(const char *s, size_t n) {
   uint16_t crc = 0xFFFF;
@@ -93,6 +94,21 @@ void OmgevingsmonitorComponent::loop() {
     return;
   }
 
+  if (this->closing_since_ != 0) {
+    // Wait until Home Assistant acknowledged the disconnect, so it records an *expected*
+    // disconnect and keeps our entities available while we are powered off.
+    bool closed = true;
+#ifdef USE_API
+    closed = api::global_api_server == nullptr || !api::global_api_server->is_connected();
+#endif
+    if ((closed || now - this->closing_since_ >= CLOSE_TIMEOUT_MS) && now - this->last_done_ >= DONE_REPEAT_MS) {
+      // Home Assistant has our states and knows we are going to sleep: switch us off.
+      this->send_("Z");
+      this->last_done_ = now;
+    }
+    return;
+  }
+
   if (!this->ha_connected_()) {
     this->connected_at_ = 0;
     return;
@@ -120,10 +136,14 @@ void OmgevingsmonitorComponent::loop() {
     this->last_cfg_ = now;
   }
 
-  if (!maint && now - this->last_done_ >= DONE_REPEAT_MS) {
-    // Home Assistant has our states: the STM32 may switch us off now.
-    this->send_("Z");
-    this->last_done_ = now;
+  if (!maint) {
+    // Home Assistant has our states. Close the API connection cleanly before the STM32 cuts
+    // power: a dropped connection makes HA mark a deep-sleep device's entities unavailable.
+    ESP_LOGI(TAG, "Report done, disconnecting from Home Assistant");
+#ifdef USE_API
+    if (api::global_api_server != nullptr) api::global_api_server->on_shutdown();
+#endif
+    this->closing_since_ = now ? now : 1;
   }
 }
 

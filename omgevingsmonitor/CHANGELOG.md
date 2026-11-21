@@ -4,6 +4,16 @@ All notable changes to the Omgevingsmonitor firmware. Versions follow
 [Semantic Versioning](https://semver.org/); the STM32 firmware and the ESPHome configuration
 share a version number.
 
+## 1.2.1 - 2026-11-21
+
+### Fixed
+
+- Home Assistant showed all entities as unavailable between reports. The STM32 cut the ESP's
+  power while the API connection was still open, so HA saw an unexpected disconnect. The ESP now
+  closes the API connection cleanly (and waits for HA to acknowledge, max 1.5 s) before it tells
+  the STM32 to switch it off; HA then keeps the values of this deep-sleep device. ESPHome only;
+  the STM32 firmware stays at 1.2.0.
+
 ## 1.2.0 - 2026-11-20
 
 ### Added

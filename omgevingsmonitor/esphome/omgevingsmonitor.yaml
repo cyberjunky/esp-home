@@ -19,7 +19,7 @@ esphome:
   min_version: 2025.10.0
   project:
     name: "wots.omgevingsmonitor"   # shown in HA as model "omgevingsmonitor" by "wots"
-    version: "1.2.0"
+    version: "1.2.1"
 
 esp32:
   board: esp32-c3-devkitm-1
